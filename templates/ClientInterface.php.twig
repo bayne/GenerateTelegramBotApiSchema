@@ -1,0 +1,38 @@
+<?php
+
+namespace Bayne\Telegram\Bot;
+
+use Bayne\Telegram\Bot\Object;
+use Psr\Http\Message\ResponseInterface;
+
+interface ClientInterface {
+{% for method in schema.methods %}
+
+    /**
+     * {{ method.link }}
+     *
+     * {{ method.description|paramDescription(2)|striptags|raw }}
+     *
+{% for parameter in method.parameters|sortByOptional %}
+     * @param {{  parameter.type }} ${{ parameter.name|camelize }}
+     *        {{ parameter.description|paramDescription(6)|raw }}
+     *
+{% endfor %}
+     * @return ResponseInterface
+     */
+    public function {{ method.name }}(
+{% for parameter in method.parameters|sortByOptional %}
+{% if parameter.is_collection %}
+        array ${{ parameter.name|camelize }}{% if not parameter.required %} = null{% endif %}{% if loop.index < method.parameters|length %},{% endif %}
+
+{% elseif parameter.is_object and parameter.is_multiple_types == false %}
+        {{ parameter.type }} ${{ parameter.name|camelize }}{% if not parameter.required %} = null{% endif %}{% if loop.index < method.parameters|length %},{% endif %}
+
+{% else %}
+        ${{ parameter.name|camelize }}{% if not parameter.required %} = null{% endif %}{% if loop.index < method.parameters|length %},{% endif %}
+
+{% endif %}
+{% endfor %}
+    );
+{% endfor %}
+}

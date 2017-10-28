@@ -4,10 +4,16 @@
     "minimum-stability": "beta",
     "require": {
         "php": "^7.0.8",
+        "psr/http-message": "^1.0",
+        "symfony/console": "^4.0@beta",
+        "symfony/css-selector": "^4.0@beta",
+        "symfony/dom-crawler": "^4.0@beta",
         "symfony/flex": "^1.0",
-        "symfony/console": "^4.0",
         "symfony/framework-bundle": "^4.0",
         "symfony/lts": "^4@dev",
+        "symfony/serializer": "^4.0@beta",
+        "symfony/twig-bundle": "^4.0@beta",
+        "symfony/var-dumper": "^4.0@beta",
         "symfony/yaml": "^4.0"
     },
     "require-dev": {
