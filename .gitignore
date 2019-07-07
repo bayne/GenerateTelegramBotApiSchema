@@ -1,8 +1,9 @@
+.idea/
+/build/
 
 ###> symfony/framework-bundle ###
 .env
 /public/bundles/
 /var/
 /vendor/
-/build/
 ###< symfony/framework-bundle ###
