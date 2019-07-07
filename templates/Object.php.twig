@@ -1,41 +1,62 @@
 <?php
 
-namespace Bayne\Telegram\Bot\Object;
-
-use Bayne\Telegram\Bot\Object;
+namespace {{ __TYPES_NAMESPACE }};
 
 class {{ object.name }} extends {{ object.parent }}
 {
 {% for field in object.fields %}
-   /**
-    * {{ object.link }}
-    *
-    * {{ field.description|striptags }}
-    *
-    * @var {{ field.type }}
-    */
-   protected ${{ field.name|camelize }};
+    /**
+     * {{ object.link }}
+     *
+     * {{ field.description|striptags }}
+     *
+     * @var {{ field.type }}
+    {%- if field.required == false -%}
+       |null
+    {%- endif %}
+
+     */
+    protected ${{ field.name|camelize }};
 
 {% endfor %}
 
 {% for field in object.fields %}
-   /**
-    * @param {{ field.type }} ${{ field.name|camelize }}
-    * @return {{ object.name }}
-    */
-   public function {{ ('set_' ~ field.name)|camelize }}({% if field.is_object and field.is_multiple_types == false and field.is_collection == false %}{{ field.type }} {% endif %}${{ field.name|camelize }})
-   {
-       $this->{{ field.name|camelize }} = ${{ field.name|camelize }};
-       return $this;
-   }
+    /**
+     * @param {{ field.type }} ${{ field.name|camelize }}
+     * @return static
+     */
+    public function {{ ('set_' ~ field.name)|camelize }}(
+    {%- if field.is_multiple_types == false -%}
+        {%- if field.is_collection %}array {% else %}{{ field.type }} {% endif -%}
+    {%- endif -%}
+    ${{ field.name|camelize }}): self
+    {
+        $this->{{ field.name|camelize }} = ${{ field.name|camelize }};
 
-   /**
-    * @return {{ field.type }}
-    */
-   public function {{ ('get_' ~ field.name)|camelize }}()
-   {
-       return $this->{{ field.name|camelize }};
-   }
+        return $this;
+    }
+
+    /**
+     * @return {{ field.type }}
+    {%- if field.required == false -%}
+        |null
+    {%- endif %}
+
+     */
+    public function {{ ('get_' ~ field.name)|camelize }}()
+     {%- if field.is_multiple_types == false -%}: {% if field.required == false -%}
+             ?
+         {%- endif -%}
+         {%- if field.is_collection -%}
+             array
+         {%- else -%}
+             {{ field.type }}
+         {%- endif -%}
+    {%- endif %}
+
+    {
+        return $this->{{ field.name|camelize }};
+    }
 
 {% endfor %}
 }

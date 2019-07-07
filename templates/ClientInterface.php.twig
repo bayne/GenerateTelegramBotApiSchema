@@ -1,8 +1,7 @@
 <?php
 
-namespace Bayne\Telegram\Bot;
+namespace {{ __BASE_NAMESPACE }};
 
-use Bayne\Telegram\Bot\Object;
 use Psr\Http\Message\ResponseInterface;
 
 interface ClientInterface {
@@ -14,25 +13,23 @@ interface ClientInterface {
      * {{ method.description|paramDescription(2)|striptags|raw }}
      *
 {% for parameter in method.parameters|sortByOptional %}
-     * @param {{  parameter.type }} ${{ parameter.name|camelize }}
+     * @param {{ parameter.type }} ${{ parameter.name|camelize }}
      *        {{ parameter.description|paramDescription(6)|raw }}
      *
 {% endfor %}
      * @return ResponseInterface
      */
     public function {{ method.name }}(
-{% for parameter in method.parameters|sortByOptional %}
-{% if parameter.is_collection %}
-        array ${{ parameter.name|camelize }}{% if not parameter.required %} = null{% endif %}{% if loop.index < method.parameters|length %},{% endif %}
+    {% for parameter in method.parameters|sortByOptional %}
 
-{% elseif parameter.is_object and parameter.is_multiple_types == false %}
-        {{ parameter.type }} ${{ parameter.name|camelize }}{% if not parameter.required %} = null{% endif %}{% if loop.index < method.parameters|length %},{% endif %}
+        {% if not parameter.is_multiple_types -%}
+            {%- if parameter.is_collection -%}array {% else %}{{ parameter.type }} {% endif -%}
+        {%- endif -%}
+            ${{ parameter.name|camelize }}
+        {%- if not parameter.required %} = null{% endif -%}
+        {%- if loop.index < method.parameters|length %},{% endif -%}
+    {%- endfor %}
 
-{% else %}
-        ${{ parameter.name|camelize }}{% if not parameter.required %} = null{% endif %}{% if loop.index < method.parameters|length %},{% endif %}
-
-{% endif %}
-{% endfor %}
-    );
+    ): ResponseInterface;
 {% endfor %}
 }

@@ -2,86 +2,99 @@
 
 namespace App\Command;
 
-
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class GenerateClientCommand extends ContainerAwareCommand
 {
-    /**
-     * 
-     */
-    protected function configure()
-    {
-        $this
-            ->setName('generate:client')
-            ->addArgument('schema', InputArgument::REQUIRED)
-        ;
-    }
 
+    public const BASE_NAMESPACE = 'Bayne\\Telegram\\Bot';
+    public const BASE_NAMESPACE_TYPES = 'Bayne\\Telegram\\Bot\\Object';
+
+    protected function configure(): void
+    {
+        $this->setName('generate:client');
+    }
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $schemaFile = $input->getArgument('schema');
-        $schema = file_get_contents($schemaFile);
+        $buildDirSource = $this->getContainer()->getParameter('kernel.root_dir') . '/../build/source/';
+        $jsonPath = $buildDirSource . 'schema.json';
+        $schema = file_get_contents($jsonPath);
         $schema = json_decode($schema, true);
-        
-        $buildDir = $this->getContainer()->getParameter('kernel.root_dir').'/../build';
 
-        if (false === is_dir($buildDir.'/Bayne/Telegram/Bot/Object')) {
-            mkdir($buildDir.'/Bayne/Telegram/Bot/Object', 0777, true);
+        $buildDir = $this->getContainer()->getParameter('kernel.root_dir') . '/../build';
+        $baseDir = $buildDir . '/' . str_replace('\\', '/', self::BASE_NAMESPACE);
+        $baseDirTypes = $buildDir . '/' . str_replace('\\', '/', self::BASE_NAMESPACE_TYPES);
+
+        if (
+            (false === is_dir($baseDirTypes))
+            && !mkdir($concurrentDirectory = $baseDirTypes, 0777, true)
+            && !is_dir($concurrentDirectory)
+        ) {
+            throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
         }
 
-
-        file_put_contents(
-            $buildDir.'/Bayne/Telegram/Bot/Object/AbstractInlineQueryResult.php',
-            $this->getContainer()->get('twig')->render(
-                'AbstractInlineQueryResult.php.twig'
-            )
-        );
-        
-        file_put_contents(
-            $buildDir.'/Bayne/Telegram/Bot/Object/AbstractInputMessageContent.php',
-            $this->getContainer()->get('twig')->render(
-                'AbstractInputMessageContent.php.twig'
-            )
+        $this->generate(
+            self::BASE_NAMESPACE,
+            self::BASE_NAMESPACE_TYPES,
+            "{$baseDirTypes}/AbstractInlineQueryResult.php",
+            'AbstractInlineQueryResult.php.twig'
         );
 
-        file_put_contents(
-            $buildDir.'/Bayne/Telegram/Bot/Object/InputFileInterface.php',
-            $this->getContainer()->get('twig')->render(
-                'InputFileInterface.php.twig'
-            )
+        $this->generate(
+            self::BASE_NAMESPACE,
+            self::BASE_NAMESPACE_TYPES,
+            "{$baseDirTypes}/AbstractInputMessageContent.php",
+            'AbstractInputMessageContent.php.twig'
         );
-        
-        file_put_contents(
-            $buildDir.'/Bayne/Telegram/Bot/Object/AbstractObject.php',
-            $this->getContainer()->get('twig')->render(
-                'AbstractObject.php.twig'
-            )
+
+        $this->generate(
+            self::BASE_NAMESPACE,
+            self::BASE_NAMESPACE_TYPES,
+            "{$baseDirTypes}/InputFileInterface.php",
+            'InputFileInterface.php.twig'
+        );
+
+        $this->generate(
+            self::BASE_NAMESPACE,
+            self::BASE_NAMESPACE_TYPES,
+            "{$baseDirTypes}/AbstractObject.php",
+            'AbstractObject.php.twig'
         );
 
         foreach ($schema['objects'] as $object) {
-            $contents = $this->getContainer()->get('twig')->render(
+            $this->generate(
+                self::BASE_NAMESPACE,
+                self::BASE_NAMESPACE_TYPES,
+                "{$baseDirTypes}/{$object['name']}.php",
                 'Object.php.twig',
-                [
-                    'object' => $object
-                ]
+                ['object' => $object]
             );
-
-            file_put_contents($buildDir.'/Bayne/Telegram/Bot/Object/'.$object['name'].'.php', $contents);
         }
 
-        $contents = $this->getContainer()->get('twig')->render(
+        $this->generate(
+            self::BASE_NAMESPACE,
+            self::BASE_NAMESPACE_TYPES,
+            "{$baseDir}/ClientInterface.php",
             'ClientInterface.php.twig',
-            [
-                'schema' => $schema
-            ]
+            ['schema' => $schema]
         );
+    }
 
-        file_put_contents($buildDir.'/Bayne/Telegram/Bot/ClientInterface.php', $contents);
-        
+    private function generate(string $baseNamespace, string $typesNamespace, string $path, string $template, array $data = []): void
+    {
+        $data['__BASE_NAMESPACE'] = $baseNamespace;
+        $data['__TYPES_NAMESPACE'] = $typesNamespace;
+
+        if (file_put_contents($path, $this->render($template, $data)) === false) {
+            throw new \RuntimeException(sprintf('Failed write to file %s', $path));
+        }
+    }
+
+    private function render(string $template, array $data = []): string
+    {
+        return $this->getContainer()->get('twig')->render($template, $data);
     }
 }
