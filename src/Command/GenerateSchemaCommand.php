@@ -156,11 +156,13 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             $description = implode("\n", $descriptions);
 
             $this->schema['methods'][] = [
-                'name'        => $methodName,
-                'parameters'  => $parameters,
-                'return'      => $this->getReturnType($description),
-                'description' => $description,
-                'link'        => $node->filter('a')->attr('href'),
+                'name'              => $methodName,
+                'parameters'        => $parameters,
+                'return'            => $type = $this->getReturnType($description),
+                'is_multiple_types' => count(explode('|', $type)) > 1,
+                'is_collection'     => strpos($type, '[]') !== false,
+                'description'       => $description,
+                'link'              => $node->filter('a')->attr('href'),
             ];
 
         }
@@ -302,34 +304,58 @@ class GenerateSchemaCommand extends ContainerAwareCommand
 
     private function getReturnType($description)
     {
-        $returnsDescription = substr($description, stripos($description, 'Return'));
-        $onSuccessDescription = substr($description, stripos($description, 'On success'));
-        if ($onSuccessDescription < $returnsDescription) {
-            $returnsDescription = $onSuccessDescription;
-        }
-        $crawler = new Crawler($returnsDescription);
-        $returnObjects = [];
-        try {
-
-            $crawler->filter('a')->each(function (Crawler $node) use (&$returnObjects) {
-                if (strpos($node->attr('href'), '#') !== 0) {
-                    try {
-                        $returnObjects[] = $this->parseType($node->text());
-                    } catch (ParseError $e) {
-
+        $href = '\<a href\=\".*?\#(?<object>.*?)\"\>.*?\<\/a\>';
+        $em = '\<em\>(?<simple>.*?)\<\/em\>';
+        $regexps = [
+            "/An (?<array>Array) of {$href} objects is returned/",
+            "/Returns {$em} on success/",
+            "/Returns the new invite link as {$em} on success/",
+            "/Returns a {$href}(?: object)?(?: on success)?\./",
+            "/Returns the uploaded {$href} on success/",
+            "/On success, the sent {$href} is returned/",
+            "/On success, an (?<array>array) of the sent {$href} is returned/",
+            "/On success, if the edited message was sent by the bot, the edited {$href} is returned, otherwise {$em} is returned/",
+            "/On success, if the message was sent by the bot, the sent {$href} is returned, otherwise {$em} is returned/",
+            "/On success, a {$href} object is returned/",
+            "/On success, returns an (?<array>Array) of {$href} objects/",
+            "/On success, {$em} is returned/",
+            "/On success, if edited message is sent by the bot, the edited {$href} is returned, otherwise {$em} is returned/",
+            "/On success, the stopped {$href} with the final results is returned/",
+            '/On success, (?<simple>True) is returned/',
+            "/On success, if the message was sent by the bot, returns the edited {$href}, otherwise returns {$em}. Returns an error/",
+            "/On success, returns an \<em\>(?<array>Array)\<\/em\> of {$href} objects/",
+        ];
+        $matchedTypes = [];
+        foreach ($regexps as $regexp) {
+            if (preg_match($regexp, $description, $match)) {
+                $type = '';
+                $types = [];
+                if (isset($match['object'])) {
+                    if (isset($match['array'])) {
+                        $type .= 'Array of ';
                     }
-                }
-            });
 
-            $crawler->filter('em')->each(function (Crawler $node) use (&$returnObjects) {
-                try {
-                    $returnObjects[] = $this->parseType($node->text());
-                } catch (ParseError $e) {
-
+                    $types[] = $type . ucfirst($match['object']);
                 }
-            });
-        } catch (ParseError $e) {
-            throw new ParseError($e . ' Could not parse description for return type: ' . $description);
+                if (isset($match['simple'])) {
+                    $types[] = $match['simple'];
+                }
+
+                $matchedTypes[] = $types;
+            }
+        }
+
+        if (count($matchedTypes) > 1) {
+            throw new \RuntimeException('Matched more than 1 return types');
+        }
+
+        if (count($matchedTypes) === 0) {
+            throw new \RuntimeException('return type does not found');
+        }
+
+        $returnObjects = [];
+        foreach ($matchedTypes[0] as $type) {
+            $returnObjects[] = $this->parseType($type);
         }
 
         return implode('|', $returnObjects);

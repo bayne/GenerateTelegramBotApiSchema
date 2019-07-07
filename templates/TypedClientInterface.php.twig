@@ -1,0 +1,40 @@
+<?php
+
+namespace {{ __BASE_NAMESPACE }};
+
+interface TypedClientInterface {
+{% for method in schema.methods %}
+
+    /**
+     * {{ method.link }}
+     *
+     * {{ method.description|paramDescription(2)|striptags|raw }}
+     *
+{% for parameter in method.parameters|sortByOptional %}
+     * @param {{ parameter.type }} ${{ parameter.name|camelize }}
+     *        {{ parameter.description|paramDescription(6)|raw }}
+     *
+{% endfor %}
+     * @return {{ method.return }};
+     */
+    public function {{ method.name }}(
+    {% for parameter in method.parameters|sortByOptional %}
+
+        {% if not parameter.is_multiple_types -%}
+            {%- if parameter.is_collection -%}array {% else %}{{ parameter.type }} {% endif -%}
+        {%- endif -%}
+            ${{ parameter.name|camelize }}
+        {%- if not parameter.required %} = null{% endif -%}
+        {%- if loop.index < method.parameters|length %},{% endif -%}
+    {%- endfor %}
+
+    ){% if not method.is_multiple_types -%}
+        :
+        {%- if method.is_collection  -%}
+            array
+        {%- else -%}
+            {{ method.return }}
+        {%- endif -%}
+    {%- endif -%};
+{% endfor %}
+}

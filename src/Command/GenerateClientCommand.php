@@ -81,6 +81,13 @@ class GenerateClientCommand extends ContainerAwareCommand
             'ClientInterface.php.twig',
             ['schema' => $schema]
         );
+        $this->generate(
+            self::BASE_NAMESPACE,
+            self::BASE_NAMESPACE_TYPES,
+            "{$baseDir}/TypedClientInterface.php",
+            'TypedClientInterface.php.twig',
+            ['schema' => $schema]
+        );
     }
 
     private function generate(string $baseNamespace, string $typesNamespace, string $path, string $template, array $data = []): void
