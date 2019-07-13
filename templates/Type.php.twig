@@ -2,11 +2,11 @@
 
 namespace {{ __TYPES_NAMESPACE }};
 
-class {{ object.name }} extends {{ object.parent }}
+class {{ type.name }} extends {{ type.parent }}
 {
-{% for field in object.fields %}
+{% for field in type.fields %}
     /**
-     * {{ object.link }}
+     * {{ type.link }}
      *
      * {{ field.description|striptags }}
      *
@@ -20,7 +20,7 @@ class {{ object.name }} extends {{ object.parent }}
 
 {% endfor %}
 
-{% for field in object.fields %}
+{% for field in type.fields %}
     /**
      * @param {{ field.type }} ${{ field.name|camelize }}
      * @return static

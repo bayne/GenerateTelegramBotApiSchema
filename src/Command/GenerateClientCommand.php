@@ -10,7 +10,7 @@ class GenerateClientCommand extends ContainerAwareCommand
 {
 
     public const BASE_NAMESPACE = 'Bayne\\Telegram\\Bot';
-    public const BASE_NAMESPACE_TYPES = 'Bayne\\Telegram\\Bot\\Object';
+    public const BASE_NAMESPACE_TYPES = self::BASE_NAMESPACE . '\\Type';
 
     protected function configure(): void
     {
@@ -60,17 +60,17 @@ class GenerateClientCommand extends ContainerAwareCommand
         $this->generate(
             self::BASE_NAMESPACE,
             self::BASE_NAMESPACE_TYPES,
-            "{$baseDirTypes}/AbstractObject.php",
-            'AbstractObject.php.twig'
+            "{$baseDirTypes}/AbstractType.php",
+            'AbstractType.php.twig'
         );
 
-        foreach ($schema['objects'] as $object) {
+        foreach ($schema['types'] as $type) {
             $this->generate(
                 self::BASE_NAMESPACE,
                 self::BASE_NAMESPACE_TYPES,
-                "{$baseDirTypes}/{$object['name']}.php",
-                'Object.php.twig',
-                ['object' => $object]
+                "{$baseDirTypes}/{$type['name']}.php",
+                'Type.php.twig',
+                ['type' => $type]
             );
         }
 

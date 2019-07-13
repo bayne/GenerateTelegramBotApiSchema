@@ -15,10 +15,6 @@ class GenerateSchemaCommand extends ContainerAwareCommand
 
     /** @var array */
     private $schema;
-    /**
-     * @var string
-     */
-    private $objectNsPrefix;
 
     protected function configure(): void
     {
@@ -32,14 +28,6 @@ class GenerateSchemaCommand extends ContainerAwareCommand
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $objectNsPrefix = str_replace(GenerateClientCommand::BASE_NAMESPACE, '', GenerateClientCommand::BASE_NAMESPACE_TYPES);
-        $objectNsPrefix = trim($objectNsPrefix, '\\');
-        if (!empty($objectNsPrefix)) {
-            $objectNsPrefix .= '\\';
-        }
-        $this->objectNsPrefix = $objectNsPrefix;
-
-
         $buildDirSource = $this->getContainer()->getParameter('kernel.root_dir') . '/../build/source/';
         $htmlPath = $buildDirSource . 'schema.html';
         $jsonPath = $buildDirSource . 'schema.json';
@@ -88,10 +76,11 @@ class GenerateSchemaCommand extends ContainerAwareCommand
                             ];
                         });
 
-                        $this->schema['objects'][] = [
-                            'name'   => $methodOrObjectName,
-                            'link'   => $node->filter('a')->attr('href'),
-                            'fields' => $fields,
+                        $this->schema['types'][$methodOrObjectName] = [
+                            'name'         => $methodOrObjectName,
+                            'link'         => $node->filter('a')->attr('href'),
+                            'fields'       => $fields,
+                            'descriptions' => $descriptions,
                         ];
 
 
@@ -107,8 +96,8 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             });
         });
 
-        foreach ($this->schema['objects'] as &$object) {
-            foreach ($object['fields'] as &$field) {
+        foreach ($this->schema['types'] as &$type) {
+            foreach ($type['fields'] as &$field) {
                 $field['type'] = $this->parseType($field['roughType']);
                 if (false !== strpos('Required', $field['description'])) {
                     $field['required'] = true;
@@ -120,9 +109,9 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             }
             unset($field);
 
-            $object['parent'] = $this->getParent($object['name']);
+            $type['parent'] = $this->getParent($type['name']);
         }
-        unset($object);
+        unset($type);
 
         foreach ($methodNodes as $methodName => $method) {
             $tableNode = $method['tableNode'];
@@ -247,22 +236,27 @@ class GenerateSchemaCommand extends ContainerAwareCommand
         }
 
         if ($text === 'InputFile') {
-            return "{$this->objectNsPrefix}InputFileInterface";
+            return $this->getClassName('InputFileInterface');
         }
 
         if ($text === 'InlineQueryResult') {
-            return "{$this->objectNsPrefix}AbstractInlineQueryResult";
+            return $this->getClassName('AbstractInlineQueryResult');
         }
 
         if ($text === 'InputMessageContent') {
-            return "{$this->objectNsPrefix}AbstractInputMessageContent";
+            return $this->getClassName('AbstractInputMessageContent');
         }
 
         if ($this->isObject($text)) {
-            return $this->objectNsPrefix . $text;
+            return $this->getClassName($text);
         }
 
         throw new ParseError('Unexpected type: ' . $text);
+    }
+
+    private function getClassName(string $className): string
+    {
+        return '\\' . GenerateClientCommand::BASE_NAMESPACE_TYPES . '\\' . $className;
     }
 
     /**
@@ -271,8 +265,8 @@ class GenerateSchemaCommand extends ContainerAwareCommand
      */
     private function isObject($text): bool
     {
-        foreach ($this->schema['objects'] as $object) {
-            if ($object['name'] === $text) {
+        foreach ($this->schema['types'] as $type) {
+            if ($type['name'] === $text) {
                 return true;
             }
         }
@@ -288,15 +282,15 @@ class GenerateSchemaCommand extends ContainerAwareCommand
     private function getParent($type): string
     {
         if (0 === strpos($type, 'InlineQueryResult')) {
-            return "{$this->objectNsPrefix}AbstractInlineQueryResult";
+            return $this->getClassName('AbstractInlineQueryResult');
         }
 
         if (0 === strpos($type, 'Input') && false !== strpos($type, 'MessageContent')) {
-            return "{$this->objectNsPrefix}AbstractInputMessageContent";
+            return $this->getClassName('AbstractInputMessageContent');
         }
 
         if (ctype_upper($type[0])) {
-            return "{$this->objectNsPrefix}AbstractObject";
+            return $this->getClassName('AbstractType');
         }
 
         throw new ParseError('Cannot determine parent of type: ' . $type);
