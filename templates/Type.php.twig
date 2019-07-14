@@ -1,16 +1,21 @@
 <?php
 
-namespace {{ __TYPES_NAMESPACE }};
+namespace {{ namespace }};
 
-class {{ type.name }} extends {{ type.parent }}
+/**
+ * {{ type.link }}
+ *
+{% for description in type.descriptions %}
+ * {{ description|paramDescription(1,' ')|striptags|raw }}
+{% endfor %}
+ */
+class {{ type.name }} extends {{ getClassName(type.parent,namespace) }}
 {
 {% for field in type.fields %}
     /**
-     * {{ type.link }}
-     *
      * {{ field.description|striptags }}
      *
-     * @var {{ field.type }}
+     * @var {{ renderType(field.type, namespace, true) }}
     {%- if field.required == false -%}
        |null
     {%- endif %}
@@ -22,14 +27,12 @@ class {{ type.name }} extends {{ type.parent }}
 
 {% for field in type.fields %}
     /**
-     * @param {{ field.type }} ${{ field.name|camelize }}
+     * @param {{ renderType(field.type, namespace, true) }} ${{ field.name|camelize }}
      * @return static
      */
     public function {{ ('set_' ~ field.name)|camelize }}(
-    {%- if field.is_multiple_types == false -%}
-        {%- if field.is_collection %}array {% else %}{{ field.type }} {% endif -%}
-    {%- endif -%}
-    ${{ field.name|camelize }}): self
+        {{- renderType(field.type, namespace, false) }} ${{ field.name|camelize -}}
+    ): self
     {
         $this->{{ field.name|camelize }} = ${{ field.name|camelize }};
 
@@ -37,21 +40,17 @@ class {{ type.name }} extends {{ type.parent }}
     }
 
     /**
-     * @return {{ field.type }}
+     * @return {{ renderType(field.type, namespace, true) }}
     {%- if field.required == false -%}
         |null
     {%- endif %}
 
      */
     public function {{ ('get_' ~ field.name)|camelize }}()
-     {%- if field.is_multiple_types == false -%}: {% if field.required == false -%}
+     {%- if isValidCodeType(field.type) -%}: {% if field.required == false -%}
              ?
          {%- endif -%}
-         {%- if field.is_collection -%}
-             array
-         {%- else -%}
-             {{ field.type }}
-         {%- endif -%}
+         {{ renderType(field.type, namespace, false) }}
     {%- endif %}
 
     {

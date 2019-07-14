@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use ParseError;
+use RuntimeException;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -12,6 +13,27 @@ class GenerateSchemaCommand extends ContainerAwareCommand
 {
     /** @var string */
     private const BOT_DOCUMENTATION_URL = 'https://core.telegram.org/bots/api';
+
+    private const TRANSFORMS = [
+        'PassportElementError' => [
+            'PassportElementErrorDataField',
+            'PassportElementErrorFrontSide',
+            'PassportElementErrorReverseSide',
+            'PassportElementErrorSelfie',
+            'PassportElementErrorFile',
+            'PassportElementErrorFiles',
+            'PassportElementErrorTranslationFile',
+            'PassportElementErrorTranslationFiles',
+            'PassportElementErrorUnspecified',
+        ],
+        'InputMedia'           => [
+            'InputMediaAnimation',
+            'InputMediaDocument',
+            'InputMediaAudio',
+            'InputMediaPhoto',
+            'InputMediaVideo',
+        ],
+    ];
 
     /** @var array */
     private $schema;
@@ -40,7 +62,7 @@ class GenerateSchemaCommand extends ContainerAwareCommand
         $html = file_get_contents($htmlPath);
 
         $this->schema = [
-            'objects' => [],
+            'types'   => [],
             'methods' => [],
         ];
 
@@ -99,12 +121,7 @@ class GenerateSchemaCommand extends ContainerAwareCommand
         foreach ($this->schema['types'] as &$type) {
             foreach ($type['fields'] as &$field) {
                 $field['type'] = $this->parseType($field['roughType']);
-                if (false !== strpos('Required', $field['description'])) {
-                    $field['required'] = true;
-                }
-                $field['is_object'] = $this->isObject($field['type']);
-                $field['is_multiple_types'] = count(explode('|', $field['type'])) > 1;
-                $field['is_collection'] = strpos($field['type'], '[]') !== false;
+                $field['required'] = stripos('Required', $field['description']) !== false;
                 unset($field['roughType']);
             }
             unset($field);
@@ -132,26 +149,21 @@ class GenerateSchemaCommand extends ContainerAwareCommand
                 }
 
                 $parameters[] = [
-                    'name'              => $rowNode->filter('td:nth-child(1)')->text(),
-                    'type'              => $type,
-                    'is_multiple_types' => count(explode('|', $type)) > 1,
-                    'is_collection'     => strpos($type, '[]') !== false,
-                    'is_object'         => $this->isObject($type),
-                    'required'          => $required,
-                    'description'       => $description,
+                    'name'        => $rowNode->filter('td:nth-child(1)')->text(),
+                    'type'        => $type,
+                    'required'    => $required,
+                    'description' => $description,
                 ];
             });
 
             $description = implode("\n", $descriptions);
 
             $this->schema['methods'][] = [
-                'name'              => $methodName,
-                'parameters'        => $parameters,
-                'return'            => $type = $this->getReturnType($description),
-                'is_multiple_types' => count(explode('|', $type)) > 1,
-                'is_collection'     => strpos($type, '[]') !== false,
-                'description'       => $description,
-                'link'              => $node->filter('a')->attr('href'),
+                'name'        => $methodName,
+                'parameters'  => $parameters,
+                'return'      => $this->getReturnType($description),
+                'description' => $description,
+                'link'        => $node->filter('a')->attr('href'),
             ];
 
         }
@@ -179,79 +191,79 @@ class GenerateSchemaCommand extends ContainerAwareCommand
 
     /**
      * @param $text
-     * @return string
+     * @return string|string[]
      */
-    private function parseType($text): string
+    private function parseType($text)
     {
-        if (false !== strpos($text, ' or ')) {
-            $pieces = explode(' or ', $text);
+        if (strpos($text, 'Array of ') !== false) {
+            [, $text] = explode(' of ', $text);
+            $types = $this->parseType($text);
+            foreach ($types as &$type) {
+                $type[1] = true;
+            }
+
+            return $types;
+        }
+
+        if (false !== strpos($text, ' or ') || false !== strpos($text, ' and ')) {
+            $divider = strpos($text, ' or ') !== false ? ' or ' : ' and ';
+            $pieces = explode($divider, $text);
             $types = [];
             foreach ($pieces as $piece) {
                 $types[] = $this->parseType($piece);
             }
 
-            return implode('|', $types);
+            return array_merge(...$types);
         }
 
-        if (false !== strpos($text, 'Array of ')) {
-            [$_, $text] = explode(' of ', $text);
-            $type = $this->parseType($text);
-            return $type . '[]';
-        }
 
         if ($text === 'Float' || $text === 'Float number') {
-            return 'float';
+            return [['float', false]];
         }
 
-        if ($text === 'Integer') {
-            return 'int';
+        if ($text === 'Integer' || $text === 'Int') {
+            return [['int', false]];
         }
 
-        if ($text === 'True') {
-            return 'bool';
+        if ($text === 'True' || $text === 'Boolean') {
+            return [['bool', false]];
         }
 
-        if ($text === 'CallbackGame') {
-            return 'array';
+        if ($text === 'CallbackGame' || $text === 'Array') {
+            return [['array', false]];
         }
 
-        if ($text === 'Array') {
-            return 'array';
-        }
-
-        if ($text === 'Integer or String') {
-            return 'string';
-        }
-
-        if ($text === 'Boolean') {
-            return 'bool';
-        }
-
-        if ($text === 'String') {
-            return 'string';
+        if ($text === 'String' || $text === 'Integer or String') {
+            return [['string', false]];
         }
 
         if ($text === 'Array of String') {
-            return 'string[]';
+            return [['string', true]];
         }
 
         if ($text === 'InputFile') {
-            return $this->getClassName('InputFileInterface');
+            return [[$this->getClassName('InputFileInterface'), false]];
         }
 
         if ($text === 'InlineQueryResult') {
-            return $this->getClassName('AbstractInlineQueryResult');
+            return [[$this->getClassName('AbstractInlineQueryResult'), false]];
         }
 
         if ($text === 'InputMessageContent') {
-            return $this->getClassName('AbstractInputMessageContent');
+            return [[$this->getClassName('AbstractInputMessageContent'), false]];
+        }
+
+        if (isset(self::TRANSFORMS[$text])) {
+            return array_map(function ($type) {
+                return [$type, false];
+            }, array_map([$this, 'getClassName'], self::TRANSFORMS[$text]));
         }
 
         if ($this->isObject($text)) {
-            return $this->getClassName($text);
+            return [[$this->getClassName($text), false]];
         }
 
-        throw new ParseError('Unexpected type: ' . $text);
+        throw new ParseError("Unexpected type: {$text}");
     }
 
     private function getClassName(string $className): string
@@ -263,23 +275,16 @@ class GenerateSchemaCommand extends ContainerAwareCommand
      * @param $text
      * @return bool
      */
-    private function isObject($text): bool
+    private function isObject(string $text): bool
     {
-        foreach ($this->schema['types'] as $type) {
-            if ($type['name'] === $text) {
-                return true;
-            }
+        if (isset($this->schema['types'][$text])) {
+            return true;
         }
 
-        try {
-            $this->getParent($text);
-            return true;
-        } catch (ParseError $e) {
-            return false;
-        }
+        throw new ParseError("Undefined type: {$text}");
     }
 
-    private function getParent($type): string
+    private function getParent(string $type): string
     {
         if (0 === strpos($type, 'InlineQueryResult')) {
             return $this->getClassName('AbstractInlineQueryResult');
@@ -298,7 +303,7 @@ class GenerateSchemaCommand extends ContainerAwareCommand
 
     private function getReturnType($description)
     {
-        $href = '\<a href\=\".*?\#(?<object>.*?)\"\>.*?\<\/a\>';
+        $href = '\<a href\=\".*?\#(?<objectAnchor>.*?)\"\>(?<objectName>.*?)\<\/a\>';
         $em = '\<em\>(?<simple>.*?)\<\/em\>';
         $regexps = [
             "/An (?<array>Array) of {$href} objects is returned/",
@@ -322,37 +327,26 @@ class GenerateSchemaCommand extends ContainerAwareCommand
         $matchedTypes = [];
         foreach ($regexps as $regexp) {
             if (preg_match($regexp, $description, $match)) {
-                $type = '';
-                $types = [];
-                if (isset($match['object'])) {
-                    if (isset($match['array'])) {
-                        $type .= 'Array of ';
+                foreach (['objectName', 'simple'] as $matchType) {
+                    if (isset($match[$matchType])) {
+                        // f**k https://core.telegram.org/bots/api#sendmediagroup
+                        if ($matchType === 'objectName' && strtolower($match['objectName']) !== strtolower($match['objectAnchor'])) {
+                            $matchType = 'objectAnchor';
+                        }
+                        foreach ($this->parseType(ucfirst($match[$matchType])) as $type) {
+                            $type[1] = isset($match['array']);
+                            $matchedTypes[] = $type;
+                        }
                     }
-
-                    $types[] = $type . ucfirst($match['object']);
                 }
-                if (isset($match['simple'])) {
-                    $types[] = $match['simple'];
-                }
-
-                $matchedTypes[] = $types;
             }
         }
 
-        if (count($matchedTypes) > 1) {
-            throw new \RuntimeException('Matched more than 1 return types');
-        }
-
         if (count($matchedTypes) === 0) {
-            throw new \RuntimeException('return type does not found');
+            throw new RuntimeException('return type does not found');
         }
 
-        $returnObjects = [];
-        foreach ($matchedTypes[0] as $type) {
-            $returnObjects[] = $this->parseType($type);
-        }
-
-        return implode('|', $returnObjects);
+        return $matchedTypes;
     }
 
 }

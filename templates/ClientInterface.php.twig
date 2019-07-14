@@ -1,6 +1,6 @@
 <?php
 
-namespace {{ __BASE_NAMESPACE }};
+namespace {{ namespace }};
 
 use Psr\Http\Message\ResponseInterface;
 
@@ -13,7 +13,7 @@ interface ClientInterface {
      * {{ method.description|paramDescription(2)|striptags|raw }}
      *
 {% for parameter in method.parameters|sortByOptional %}
-     * @param {{ parameter.type }} ${{ parameter.name|camelize }}
+     * @param {{ renderType(parameter.type, namespace, true) }} ${{ parameter.name|camelize }}
      *        {{ parameter.description|paramDescription(6)|raw }}
      *
 {% endfor %}
@@ -22,10 +22,7 @@ interface ClientInterface {
     public function {{ method.name }}(
     {% for parameter in method.parameters|sortByOptional %}
 
-        {% if not parameter.is_multiple_types -%}
-            {%- if parameter.is_collection -%}array {% else %}{{ parameter.type }} {% endif -%}
-        {%- endif -%}
-            ${{ parameter.name|camelize }}
+        {{ renderType(parameter.type, namespace, false) }} ${{ parameter.name|camelize }}
         {%- if not parameter.required %} = null{% endif -%}
         {%- if loop.index < method.parameters|length %},{% endif -%}
     {%- endfor %}

@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use RuntimeException;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -33,75 +34,67 @@ class GenerateClientCommand extends ContainerAwareCommand
             && !mkdir($concurrentDirectory = $baseDirTypes, 0777, true)
             && !is_dir($concurrentDirectory)
         ) {
-            throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
+            throw new RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
         }
 
-        $this->generate(
-            self::BASE_NAMESPACE,
-            self::BASE_NAMESPACE_TYPES,
-            "{$baseDirTypes}/AbstractInlineQueryResult.php",
-            'AbstractInlineQueryResult.php.twig'
-        );
+        $types = [
+            [
+                'AbstractInlineQueryResult',
+                ['namespace' => self::BASE_NAMESPACE_TYPES],
+            ], [
+                'AbstractInputMessageContent',
+                ['namespace' => self::BASE_NAMESPACE_TYPES],
+            ], [
+                'InputFileInterface',
+                ['namespace' => self::BASE_NAMESPACE_TYPES],
+            ], [
+                'AbstractType',
+                ['namespace' => self::BASE_NAMESPACE_TYPES],
+            ],
+        ];
 
-        $this->generate(
-            self::BASE_NAMESPACE,
-            self::BASE_NAMESPACE_TYPES,
-            "{$baseDirTypes}/AbstractInputMessageContent.php",
-            'AbstractInputMessageContent.php.twig'
-        );
+        $clients = [
+            [
+                'ClientInterface',
+                ['namespace' => self::BASE_NAMESPACE, 'schema' => $schema],
+            ], [
+                'TypedClientInterface',
+                ['namespace' => self::BASE_NAMESPACE, 'schema' => $schema],
+            ],
+        ];
 
-        $this->generate(
-            self::BASE_NAMESPACE,
-            self::BASE_NAMESPACE_TYPES,
-            "{$baseDirTypes}/InputFileInterface.php",
-            'InputFileInterface.php.twig'
-        );
+        foreach ($types as $type) {
+            $this->generate($baseDirTypes, ...$type);
+        }
 
-        $this->generate(
-            self::BASE_NAMESPACE,
-            self::BASE_NAMESPACE_TYPES,
-            "{$baseDirTypes}/AbstractType.php",
-            'AbstractType.php.twig'
-        );
+        foreach ($clients as $type) {
+            $this->generate($baseDir, ...$type);
+        }
 
         foreach ($schema['types'] as $type) {
-            $this->generate(
-                self::BASE_NAMESPACE,
-                self::BASE_NAMESPACE_TYPES,
-                "{$baseDirTypes}/{$type['name']}.php",
-                'Type.php.twig',
-                ['type' => $type]
-            );
-        }
+            $data = [
+                $baseDirTypes,
+                $type['name'],
+                [
+                    'type'      => $type,
+                    'namespace' => self::BASE_NAMESPACE_TYPES,
+                ],
+                'Type',
+            ];
 
-        $this->generate(
-            self::BASE_NAMESPACE,
-            self::BASE_NAMESPACE_TYPES,
-            "{$baseDir}/ClientInterface.php",
-            'ClientInterface.php.twig',
-            ['schema' => $schema]
-        );
-        $this->generate(
-            self::BASE_NAMESPACE,
-            self::BASE_NAMESPACE_TYPES,
-            "{$baseDir}/TypedClientInterface.php",
-            'TypedClientInterface.php.twig',
-            ['schema' => $schema]
-        );
-    }
-
-    private function generate(string $baseNamespace, string $typesNamespace, string $path, string $template, array $data = []): void
-    {
-        $data['__BASE_NAMESPACE'] = $baseNamespace;
-        $data['__TYPES_NAMESPACE'] = $typesNamespace;
-
-        if (file_put_contents($path, $this->render($template, $data)) === false) {
-            throw new \RuntimeException(sprintf('Failed write to file %s', $path));
+            $this->generate(...$data);
         }
     }
 
-    private function render(string $template, array $data = []): string
+    private function generate(string $basePath, string $type, array $data = [], string $template = null): void
     {
-        return $this->getContainer()->get('twig')->render($template, $data);
+        $templateFile = $template ?? $type;
+        $filePath = $basePath . "/{$type}.php";
+
+        $content = $this->getContainer()->get('twig')->render("{$templateFile}.php.twig", $data);
+
+        if (file_put_contents($filePath, $content) === false) {
+            throw new RuntimeException(sprintf('Failed write to file %s', $filePath));
+        }
     }
 }

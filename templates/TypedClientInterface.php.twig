@@ -1,6 +1,6 @@
 <?php
 
-namespace {{ __BASE_NAMESPACE }};
+namespace {{ namespace }};
 
 interface TypedClientInterface {
 {% for method in schema.methods %}
@@ -11,30 +11,25 @@ interface TypedClientInterface {
      * {{ method.description|paramDescription(2)|striptags|raw }}
      *
 {% for parameter in method.parameters|sortByOptional %}
-     * @param {{ parameter.type }} ${{ parameter.name|camelize }}
+     * @param {{ renderType(parameter.type, namespace, true) }} ${{ parameter.name|camelize }}
      *        {{ parameter.description|paramDescription(6)|raw }}
      *
 {% endfor %}
-     * @return {{ method.return }};
+     * @return {{ renderType(method.return,namespace,true) }};
      */
     public function {{ method.name }}(
     {% for parameter in method.parameters|sortByOptional %}
 
-        {% if not parameter.is_multiple_types -%}
-            {%- if parameter.is_collection -%}array {% else %}{{ parameter.type }} {% endif -%}
-        {%- endif -%}
-            ${{ parameter.name|camelize }}
+        {% if isValidCodeType(parameter.type) -%} {{ renderType(parameter.type, namespace, false) }} {% endif -%}
+
+        ${{ parameter.name|camelize }}
+
         {%- if not parameter.required %} = null{% endif -%}
         {%- if loop.index < method.parameters|length %},{% endif -%}
     {%- endfor %}
 
-    ){% if not method.is_multiple_types -%}
-        :
-        {%- if method.is_collection  -%}
-            array
-        {%- else -%}
-            {{ method.return }}
-        {%- endif -%}
+    ){% if isValidCodeType(method.return) -%}
+        : {{ renderType(method.return, namespace, false) }}
     {%- endif -%};
 {% endfor %}
 }
