@@ -134,11 +134,7 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             $tableNode = $method['tableNode'];
             $descriptions = $method['descriptions'];
             $parameters = [];
-            $tableNode->filter('tbody tr')->each(function (Crawler $rowNode, $rowNumber) use (&$parameters) {
-                if ($rowNumber === 0) {
-                    return;
-                }
-
+            $tableNode->filter('tbody tr')->each(function (Crawler $rowNode) use (&$parameters) {
                 $type = $this->parseType($rowNode->filter('td:nth-child(2)')->text());
                 $description = $rowNode->filter('td:nth-child(4)')->text();
 
