@@ -55,9 +55,6 @@ class GenerateClientCommand extends ContainerAwareCommand
 
         $clients = [
             [
-                'ClientInterface',
-                ['namespace' => self::BASE_NAMESPACE, 'schema' => $schema],
-            ], [
                 'TypedClientInterface',
                 ['namespace' => self::BASE_NAMESPACE, 'schema' => $schema],
             ],

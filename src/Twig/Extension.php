@@ -73,7 +73,7 @@ class Extension extends \Twig_Extension
 
     private function isSimpleType(string $type): bool
     {
-        return in_array($type, ['int', 'string', 'float', 'object', 'array'], true);
+        return in_array($type, ['int', 'string', 'float', 'object', 'array', 'bool'], true);
     }
 
     public function camelize($string)

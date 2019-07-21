@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace {{ namespace }};
 
@@ -18,16 +18,13 @@ interface TypedClientInterface {
      * @return {{ renderType(method.return,namespace,true) }};
      */
     public function {{ method.name }}(
-    {% for parameter in method.parameters|sortByOptional %}
-
+{% for parameter in method.parameters|sortByOptional %}
         {% if isValidCodeType(parameter.type) -%} {{ renderType(parameter.type, namespace, false) }} {% endif -%}
-
         ${{ parameter.name|camelize }}
+        {%- if not parameter.required %} = null{% endif %}
+        {%- if loop.index < method.parameters|length %},{% endif %}
 
-        {%- if not parameter.required %} = null{% endif -%}
-        {%- if loop.index < method.parameters|length %},{% endif -%}
-    {%- endfor %}
-
+{% endfor %}
     ){% if isValidCodeType(method.return) -%}
         : {{ renderType(method.return, namespace, false) }}
     {%- endif -%};
